@@ -37,10 +37,7 @@ usage: pypacker
 
 verbose = "-v" in sys.argv
 
-vprint = lambda *a: None
-if verbose:
-    vprint = lambda *a: print(*a)
-
+vprint = (lambda *a: print(*a)) if verbose else (lambda *a: None)
 treeshake_app = "-ta" in sys.argv or "-t" in sys.argv
 treeshake_libs = "-tl" in sys.argv or "-t" in sys.argv
 retain_analysis = "-ax" in sys.argv
@@ -53,16 +50,8 @@ pyc_opt_level = 0
 entry_function = None
 
 for idx, a in enumerate(sys.argv):
-    if a == "-tlx":
-        treeshake_exclude.add(sys.argv[idx + 1])
-        treeshake_include = None
-        treeshake_libs = True
-
-    elif a == "-tli":
-        treeshake_include.add(sys.argv[idx + 1])
-        treeshake_exclude = None
-        treeshake_libs = True
-
+    if a == "-f":
+        entry_function = sys.argv[idx+1]
     elif a == "-o":
         try:
             level = int(sys.argv[idx + 1])
@@ -72,8 +61,15 @@ for idx, a in enumerate(sys.argv):
             level = max(0, min(level, 2))
         pyc_opt_level = level
 
-    elif a == "-f":
-        entry_function = sys.argv[idx+1]
+    elif a == "-tli":
+        treeshake_include.add(sys.argv[idx + 1])
+        treeshake_exclude = None
+        treeshake_libs = True
+
+    elif a == "-tlx":
+        treeshake_exclude.add(sys.argv[idx + 1])
+        treeshake_include = None
+        treeshake_libs = True
 
 class Analysis:
     def __init__(self, app_name):
@@ -204,7 +200,7 @@ with open("{self.app_name}.tmp","w") as f:
         # TODO:
         # migrate copyfile information from old json
 
-        filename = f"tracefile.json"
+        filename = 'tracefile.json'
 
         with open(filename, "w") as f:
             json.dump(output, f, indent=4)
@@ -406,10 +402,7 @@ class AppInfo:
                 ):
                     ts = False
                 elif treeshake_include:
-                    ts = False
-                    if pathlib.Path(libpath).stem in treeshake_include:
-                        ts = True
-
+                    ts = pathlib.Path(libpath).stem in treeshake_include
                 for path, _, files in os.walk(libpath):
                     if "__pycache__" in path:
                         continue
@@ -475,6 +468,7 @@ class AppInfo:
 
         all_paths = set()
 
+        ap2 = set()
         if treeshake_app:
 
             print("Treeshaking app")
@@ -492,7 +486,6 @@ class AppInfo:
                 )
                 self.app_zip.write(compiled, f"{file}c")
 
-            ap2 = set()
             for p in all_paths:
                 for path, _, files in os.walk(p):
                     if "__pycache__" in path:
@@ -501,14 +494,11 @@ class AppInfo:
 
             for dir in ap2:
                 for file in pathlib.Path(dir).glob("*"):
-                    if file.is_file():
-                        if not file.suffix == ".py":
-                            target = pathlib.Path(self.build_path, dir)
-                            if not target.exists():
-                                target.mkdir(parents=True)
-                            shutil.copy(file, target)
-
-            self.app_zip.close()
+                    if file.is_file() and file.suffix != ".py":
+                        target = pathlib.Path(self.build_path, dir)
+                        if not target.exists():
+                            target.mkdir(parents=True)
+                        shutil.copy(file, target)
 
         else:
 
@@ -528,8 +518,6 @@ class AppInfo:
                     all_paths.add(path_to_file.parent)
                 if not path_to_file.exists():
                     continue
-
-            ap2 = set()
 
             for p in all_paths:
                 for path, _, files in os.walk(p):
@@ -562,7 +550,8 @@ class AppInfo:
                         )
                         self.app_zip.write(compiled, f"{path}\\{file}c")
 
-            self.app_zip.close()
+
+        self.app_zip.close()
 
     def add_site_customization(self):
 
@@ -659,10 +648,10 @@ def main():
     print(f"App dir: {appinfo.appdir}")
     print(f"Entry script: {appinfo.boot}")
     print(f"Lib dirs: {appinfo.lib_dirs}")
-    vprint(f"Stdlib items:")
+    vprint('Stdlib items:')
     for item in appinfo.stdlib:
         vprint("\t", item)
-    vprint(f"Exclude items:")
+    vprint('Exclude items:')
     for item in appinfo.exclude:
         vprint("\t", item)
 
